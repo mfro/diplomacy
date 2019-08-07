@@ -37,9 +37,7 @@ async function game_history(query: string) {
     let data;
     try {
         data = fs.readFileSync(cache, 'utf8');
-        console.debug(`cache hit ${query}`);
     } catch (e) {
-        console.debug(`cache miss ${query}`);
         data = await playdiplomacy(`/game_history.php?${query}`);
         await fs.writeFile(cache, data, 'utf8');
     }
@@ -170,6 +168,7 @@ export function write_game(turns: Turn[]) {
 
 export async function run() {
     fs.mkdirpSync('data');
+    fs.mkdirpSync('cache');
 
     let known: number[] = fs.readJSONSync('data/known.json');
     let errors = 0;
