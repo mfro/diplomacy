@@ -1,0 +1,24 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "main": "main.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "rollup -c rollup.config.js",
+    "watch": "rollup -c rollup.config.js --watch"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^8.0.0",
+    "@types/request-promise-native": "^1.0.16",
+    "rollup": "^1.17.0",
+    "rollup-plugin-json": "^4.0.0",
+    "rollup-plugin-string": "^3.0.0",
+    "rollup-plugin-typescript2": "^0.22.0",
+    "typescript": "^3.5.3"
+  },
+  "dependencies": {
+    "fs-extra": "^8.1.0",
+    "request": "^2.88.0",
+    "request-promise-native": "^1.0.7"
+  }
+}

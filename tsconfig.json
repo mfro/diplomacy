@@ -1,0 +1,22 @@
+{
+    "compilerOptions": {
+        "module": "es2015",
+        "target": "es2015",
+        "strict": true,
+
+        "jsx": "react",
+        "jsxFactory": "jsx",
+
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true,
+
+        "sourceMap": true
+    },
+    "include": [
+        "src/**/*.ts", "src/**/*.tsx"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}
