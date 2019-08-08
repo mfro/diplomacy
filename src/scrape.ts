@@ -303,7 +303,7 @@ export function parse_orders(game: GameState, inputs: Inputs) {
 
             let order;
 
-            if (op == 'HOLD') {
+            if (op == 'HOLD' || result == 'Illegal order replaced with Hold order') {
                 order = new HoldOrder(unit);
             } else if (op == 'MOVE') {
                 let moveArgs = args.split('VIA');

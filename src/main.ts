@@ -14,7 +14,7 @@ function* matches(regex: RegExp, target: string) {
         yield match;
 }
 
-const ignored_games = new Set([159594, 158093, 147485]);
+const ignored_games = new Set([159594, 158093, 151387, 147485, 152046, 151325]);
 
 function run_game(id: number, turns: scrape.Turn[]) {
     let game = new GameState(europe, []);
@@ -24,6 +24,11 @@ function run_game(id: number, turns: scrape.Turn[]) {
 
         let remote = scrape.parse_orders(game, turns[i].orders);
         let orders = remote.orders.slice();
+
+        if (orders.find(o => o.type == 'move' && o.requireConvoy)) {
+            console.log(`skipping ${id} - found VIA CONVOY`);
+            break;
+        }
 
         for (let unit of game.units) {
             let order = orders.find(o => o.unit == unit);
@@ -104,23 +109,6 @@ async function run() {
         console.log(`processing game ${id}`);
 
         let game = scrape.read_game(fs.readFileSync(`data/${id}`));
-        for (let turn of game) {
-            if (turn.builds && Object.keys(turn.builds).length == 0) {
-                delete turn.builds;
-            }
-            if (turn.retreats && Object.keys(turn.retreats).length == 0) {
-                delete turn.retreats;
-            }
-            if (Object.keys(turn.orders).length == 0) {
-                // sometimes games have an empty last turn with no orders
-                if (turn.builds || turn.retreats
-                    || game.indexOf(turn) + 1 != game.length)
-                    throw error(`missing orders: ${id} ${game.indexOf(turn)}`);
-                game.pop();
-                break;
-            }
-        }
-
         run_game(parseInt(id), game);
     }
 }
