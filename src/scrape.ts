@@ -78,8 +78,6 @@ export async function get_game(id: number) {
     let turns = [];
     let history = await game_history(`game_id=${id}`);
 
-    let builds = 0, retreats = 0;
-
     for (let content of history.split('</br></br>')) {
         let date = turns.length;
         let turn: Turn = { orders: {} };
@@ -96,8 +94,8 @@ export async function get_game(id: number) {
             found = true;
             switch (phase) {
                 case 'O': turn.orders = inputs || {}; break;
-                case 'R': turn.retreats = inputs; ++retreats; break;
-                case 'B': turn.builds = inputs; ++builds; break;
+                case 'R': turn.retreats = inputs;  break;
+                case 'B': turn.builds = inputs;  break;
             }
         }
 
@@ -105,9 +103,6 @@ export async function get_game(id: number) {
 
         turns.push(turn);
     }
-
-    if (builds == 0 && turns.length > 4)
-        throw error(`No builds while parsing ${id}`);
 
     return turns;
 }
