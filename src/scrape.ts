@@ -260,7 +260,7 @@ export async function check() {
             if (game[i].retreats) retreats++;
         }
 
-        if (builds == 0 || retreats == 0) {
+        if (builds == 0 && retreats == 0) {
             game = await get_game(parseInt(id));
             console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns} *`);
         } else {
