@@ -203,7 +203,7 @@ export async function run() {
 
                 fs.writeFileSync(`data/${id}`, data);
 
-                if (!known.includes(id)) {
+                if (errors == 0 && !known.includes(id)) {
                     if (known_skipped)
                         known.push(id);
                     else
