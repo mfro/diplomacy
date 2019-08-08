@@ -171,12 +171,37 @@ export async function run() {
     fs.mkdirpSync('cache');
 
     let errors = 0;
+    let oldKnown;
+    let newKnown = { newest: 0, count: 0 };
+    try {
+        oldKnown = fs.readJSONSync('data/known.json') as typeof newKnown;
+    } catch (e) {
+        oldKnown = null;
+    }
 
     for (let i = 1; i <= 1000 && errors < 10; ++i) {
         console.log(`fetching page ${i}:`)
         let ids = await get_page(i);
 
         for (let id of ids) {
+            if (newKnown.newest == 0)
+                newKnown.newest = id;
+
+            if (oldKnown && id == oldKnown.newest) {
+                let skip = Math.floor(oldKnown.count / 15) - 1;
+                i += skip;
+
+                console.log(`found known, skipping to page ${i + 1} (${oldKnown.count} games)`);
+
+                if (skip == 0) {
+                    oldKnown = null;
+                } else {
+                    newKnown.count += oldKnown.count;
+                    oldKnown = null;
+                    break;
+                }
+            }
+
             console.log(`fetching game ${id}`)
             try {
                 let outputFile = `data/${id}`;
@@ -190,10 +215,50 @@ export async function run() {
 
                     fs.writeFileSync(outputFile, data);
                 }
+
+                ++newKnown.count;
             } catch (e) {
                 ++errors;
                 console.error(id, e);
             }
         }
+
+        if (oldKnown == null) {
+            fs.writeJSONSync('data/known.json', newKnown);
+            console.log(`known: ${newKnown.newest} +${newKnown.count}`);
+        }
+    }
+}
+
+export async function check() {
+    fs.mkdirpSync('data');
+    fs.mkdirpSync('cache');
+
+    let count = 0;
+    let allIds = fs.readdirSync('data');
+
+    for (let id of allIds) {
+        if (id == 'known.json') continue;
+
+        let game = read_game(fs.readFileSync(`data/${id}`));
+
+        let turns = 0;
+        let history = await game_history(`game_id=${id}`);
+
+        for (let content of history.split('</br></br>')) {
+            let found = false;
+            for (let _ of matches(/<a href='game_history\.php\?game_id=(\d+)&phase=(\w)&gdate=(\d+)/, content)) {
+                found = true;
+                break;
+            }
+
+            if (!found) continue;
+            ++turns;
+        }
+
+        if (turns != game.length || turns == 0)
+            throw error(`Mismatch: ${id} ${turns} ${game.length}`);
+
+        console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
     }
 }

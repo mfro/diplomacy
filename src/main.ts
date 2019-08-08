@@ -356,9 +356,15 @@ async function run() {
     console.log(...failed);
 }
 
-// run_game(158438);
-// run();
-scrape.run();
+let op = process.argv[2];
+
+if (op == 'scrape')
+    scrape.run();
+else if (op == 'check')
+    scrape.check();
+else {
+    console.log('unknown or missing command')
+}
 
 let x = global;
 
