@@ -232,15 +232,19 @@ export async function check() {
 
         let builds = 0;
         let retreats = 0;
-        for (let turn of game) {
-            if (turn.builds) builds++;
-            if (turn.retreats) retreats++;
+        for (let i = 0; i < game.length; ++i) {
+            if (game[i].builds) builds++;
+            if (game[i].retreats) retreats++;
         }
 
-        if (builds == 0 || retreats == 0)
+        if (builds == 0 || retreats == 0) {
+            let game = await get_game(parseInt(id));
+            let data = write_game(game);
+            fs.writeFileSync(`data/${id}`, data);
             console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns} *`);
-        else
+        } else {
             console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
+        }
     }
 }
 
