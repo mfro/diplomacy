@@ -31,7 +31,6 @@ function run_game(id: number, turns: scrape.Turn[]) {
             orders.push(new HoldOrder(unit))
         }
 
-        debugger;
         let local = resolve(orders);
 
         for (let move of local.resolved) {
@@ -50,9 +49,9 @@ function run_game(id: number, turns: scrape.Turn[]) {
             }
         }
 
-        if (local.evicted.length == 0 != !turns[i].retreats) {
-            throw error(`Mismatch in game ${id}`);
-        }
+        // if (local.evicted.length == 0 != !turns[i].retreats) {
+        //     throw error(`Mismatch in game ${id}`);
+        // }
 
         if (local.evicted.length) {
             let evicted = new Set(local.evicted);
@@ -100,12 +99,14 @@ async function run() {
     for (let id of allIds) {
         if (id == 'known.json') continue;
 
+        console.log(`processing game ${id}`);
+
         let game = scrape.read_game(fs.readFileSync(`data/${id}`));
         for (let turn of game) {
-            if (turn.builds && Object.keys(turn.builds)) {
+            if (turn.builds && Object.keys(turn.builds).length == 0) {
                 delete turn.builds;
             }
-            if (turn.retreats && Object.keys(turn.retreats)) {
+            if (turn.retreats && Object.keys(turn.retreats).length == 0) {
                 delete turn.retreats;
             }
             if (Object.keys(turn.orders).length == 0) {
@@ -119,8 +120,6 @@ async function run() {
         }
 
         run_game(parseInt(id), game);
-
-        console.log(`processed game ${id}`);
     }
 }
 

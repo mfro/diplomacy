@@ -230,7 +230,17 @@ export async function check() {
         if (turns != game.length || turns == 0)
             throw error(`Mismatch: ${id} ${turns} ${game.length}`);
 
-        console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
+        let builds = 0;
+        let retreats = 0;
+        for (let turn of game) {
+            if (turn.builds) builds++;
+            if (turn.retreats) retreats++;
+        }
+
+        if (builds == 0 || retreats == 0)
+            console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns} *`);
+        else
+            console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
     }
 }
 
