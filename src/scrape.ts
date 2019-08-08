@@ -251,8 +251,12 @@ export async function check() {
             ++turns;
         }
 
-        if (turns != game.length || turns == 0)
-            throw error(`Mismatch: ${id} ${turns} ${game.length}`);
+        if (turns != game.length || turns == 0) {
+            game = await get_game(parseInt(id));
+            if (turns != game.length || turns == 0) {
+                throw error(`Mismatch: ${id} ${turns} ${game.length}`);
+            }
+        }
 
         let builds = 0;
         let retreats = 0;
