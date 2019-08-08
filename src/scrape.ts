@@ -230,33 +230,7 @@ export async function check() {
         if (turns != game.length || turns == 0)
             throw error(`Mismatch: ${id} ${turns} ${game.length}`);
 
-        let changed = false;
-        for (let turn of game) {
-            if (turn.builds && Object.keys(turn.builds)) {
-                delete turn.builds;
-                changed = true;
-            }
-            if (turn.retreats && Object.keys(turn.retreats)) {
-                delete turn.retreats;
-                changed = true;
-            }
-            if (Object.keys(turn.orders).length == 0) {
-                // sometimes games have an empty last turn with no orders
-                if (turn.builds || turn.retreats
-                    || game.indexOf(turn) + 1 != game.length)
-                    throw error(`missing orders: ${id} ${game.indexOf(turn)}`);
-                game.pop();
-                changed = true;
-                break;
-            }
-        }
-
-        if (changed) {
-            fs.writeFileSync(`data/${id}`, write_game(game));
-            console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns} *`);
-        } else {
-            console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
-        }
+        console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
     }
 }
 

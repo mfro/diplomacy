@@ -101,6 +101,23 @@ async function run() {
         if (id == 'known.json') continue;
 
         let game = scrape.read_game(fs.readFileSync(`data/${id}`));
+        for (let turn of game) {
+            if (turn.builds && Object.keys(turn.builds)) {
+                delete turn.builds;
+            }
+            if (turn.retreats && Object.keys(turn.retreats)) {
+                delete turn.retreats;
+            }
+            if (Object.keys(turn.orders).length == 0) {
+                // sometimes games have an empty last turn with no orders
+                if (turn.builds || turn.retreats
+                    || game.indexOf(turn) + 1 != game.length)
+                    throw error(`missing orders: ${id} ${game.indexOf(turn)}`);
+                game.pop();
+                break;
+            }
+        }
+
         run_game(parseInt(id), game);
 
         console.log(`processed game ${id}`);
