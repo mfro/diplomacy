@@ -232,15 +232,22 @@ export async function check() {
 
         let changed = false;
         for (let turn of game) {
-            if (Object.keys(turn.orders).length == 0)
-                throw error(`missing orders: ${id} ${game.indexOf(turn)}`);
+            if (turn.builds && Object.keys(turn.builds)) {
+                delete turn.builds;
+                changed = true;
+            }
             if (turn.retreats && Object.keys(turn.retreats)) {
                 delete turn.retreats;
                 changed = true;
             }
-            if (turn.builds && Object.keys(turn.builds)) {
-                delete turn.builds;
+            if (Object.keys(turn.orders).length == 0) {
+                // sometimes games have an empty last turn with no orders
+                if (turn.builds || turn.retreats
+                    || game.indexOf(turn) + 1 != game.length)
+                    throw error(`missing orders: ${id} ${game.indexOf(turn)}`);
+                game.pop();
                 changed = true;
+                break;
             }
         }
 
