@@ -71,7 +71,7 @@ async function get_history(id: number, phase: string, date: number) {
     if (found)
         return inputs;
 
-    return null;
+    return undefined;
 }
 
 export async function get_game(id: number) {
@@ -89,11 +89,11 @@ export async function get_game(id: number) {
 
             let phase = match[2];
             let inputs = await get_history(id, phase, date);
-            if (inputs == null) continue;
+            if (inputs == null && phase != 'O') continue;
 
             found = true;
             switch (phase) {
-                case 'O': turn.orders = inputs; break;
+                case 'O': turn.orders = inputs || {}; break;
                 case 'R': turn.retreats = inputs; break;
                 case 'B': turn.builds = inputs; break;
             }
