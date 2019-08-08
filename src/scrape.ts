@@ -3,10 +3,13 @@ import zlib from 'zlib';
 import fs from 'fs-extra';
 import request from 'request-promise-native';
 import { error, matches } from './util';
+import { GameState, Unit, UnitType } from './game';
+import { REGIONS, europe } from './data';
+import { HoldOrder, MoveOrder, SupportOrder, ConvoyOrder } from './rules';
 
-type Inputs = { [team: string]: string[] };
+export type Inputs = { [team: string]: string[] };
 
-interface Turn {
+export interface Turn {
     orders: Inputs,
     retreats?: Inputs,
     builds?: Inputs,
@@ -49,6 +52,7 @@ async function get_history(id: number, phase: string, date: number) {
     let query = `game_id=${id}&phase=${phase}&gdate=${date}`;
     let data = await game_history(query);
 
+    let found = false;
     let inputs: Inputs = {};
 
     for (let match of matches(/<b>(\w+)<\/b><ul>(.*?)<\/ul>/, data)) {
@@ -58,11 +62,16 @@ async function get_history(id: number, phase: string, date: number) {
         for (let part of matches(/<li>(.*?)<\/li>/, match[2])) {
             list.push(part[1]);
         }
+        if (list.length == 0) continue;
 
+        found = true;
         inputs[team] = list;
     }
 
-    return inputs;
+    if (found)
+        return inputs;
+
+    return null;
 }
 
 export async function get_game(id: number) {
@@ -78,9 +87,11 @@ export async function get_game(id: number) {
             if (id != parseInt(match[1])) throw error(`Failed to parse game history: ${id}`);
             if (date != parseInt(match[3])) throw error(`Failed to parse game history: ${id}`);
 
-            found = true;
             let phase = match[2];
             let inputs = await get_history(id, phase, date);
+            if (inputs == null) continue;
+
+            found = true;
             switch (phase) {
                 case 'O': turn.orders = inputs; break;
                 case 'R': turn.retreats = inputs; break;
@@ -219,6 +230,185 @@ export async function check() {
         if (turns != game.length || turns == 0)
             throw error(`Mismatch: ${id} ${turns} ${game.length}`);
 
-        console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
+        let changed = false;
+        for (let turn of game) {
+            if (Object.keys(turn.orders).length == 0)
+                throw error(`missing orders: ${id} ${game.indexOf(turn)}`);
+            if (turn.retreats && Object.keys(turn.retreats)) {
+                delete turn.retreats;
+                changed = true;
+            }
+            if (turn.builds && Object.keys(turn.builds)) {
+                delete turn.builds;
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            fs.writeFileSync(`data/${id}`, write_game(game));
+            console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns} *`);
+        } else {
+            console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
+        }
     }
+}
+
+export function parse_orders(game: GameState, inputs: Inputs) {
+    let isNew = game.units.size == 0;
+    let fleets = new Set([REGIONS.LON, REGIONS.EDI, REGIONS.BRE, REGIONS.NAP, REGIONS.KIE, REGIONS.TRI, REGIONS.ANK, REGIONS.SEV, REGIONS.STP_SOUTH]);
+
+    let orders = [];
+    let resolved = [];
+
+    for (let team in inputs) {
+        for (let raw of inputs[team]) {
+            let match = /(.*?)(HOLD|MOVE|SUPPORT|CONVOY)(.*)->(.*)/.exec(raw);
+            if (match == null) throw error(`failed to match order: ${raw}`);
+
+            let regionName = match[1].trim();
+            let op = match[2];
+            let args = match[3].trim();
+            let result = match[4].trim();
+
+            if (result == 'Invalid order or syntax error')
+                continue;
+
+            let region = game.map.regions.find(r => r.name == regionName);
+            if (region == null) throw error(`failed to find region for order: ${raw} `);
+
+            let unit = [...game.units].find(u => u.region == region && u.team == team);
+            if (unit == null) {
+                if (isNew) game.units.add(unit = new Unit(region, fleets.has(region) ? UnitType.Water : UnitType.Land, team));
+                else throw error(`Unit does not exist: ${team} ${region.name} `);
+            }
+
+            let order;
+
+            if (op == 'HOLD') {
+                order = new HoldOrder(unit);
+            } else if (op == 'MOVE') {
+                let moveArgs = args.split('VIA');
+
+                let rawTarget = moveArgs[0].trim();
+                let target = europe.regions.find(r => r.name == rawTarget);
+                if (target == null) throw error(`failed to find target region for move order: ${args} `);
+
+                order = new MoveOrder(unit, target, moveArgs.length > 1);
+                if (result == 'resolved') {
+                    resolved.push(order)
+                }
+            } else if (op == 'SUPPORT') {
+                let [rawSrc, rawDst] = args.split(' to '); // 'X to hold' or 'X to Y'
+
+                let src = europe.regions.find(r => r.name == rawSrc);
+                if (src == null) throw error(`failed to find target region for support order: ${rawSrc} `);
+
+                if (rawDst == 'hold')
+                    order = new SupportOrder(unit, src);
+                else {
+                    let dst = europe.regions.find(r => r.name == rawDst);
+                    if (dst == null) throw error(`failed to find attack region for support order: ${rawDst} `);
+
+                    order = new SupportOrder(unit, src, dst);
+                }
+            } else if (op == 'CONVOY') {
+                let [rawSrc, rawDst] = args.split(' to '); // 'X to Y'
+
+                let src = europe.regions.find(r => r.name == rawSrc);
+                if (src == null) throw error(`failed to find start region for convoy order: ${rawSrc} `);
+
+                let dst = europe.regions.find(r => r.name == rawDst);
+                if (dst == null) throw error(`failed to find end region for convoy order: ${rawDst} `);
+
+                order = new ConvoyOrder(unit, src, dst);
+            } else {
+                throw error(`invalid order: ${op}`)
+            }
+
+            orders.push(order);
+
+        }
+    }
+
+    return { orders, resolved };
+}
+
+export function parse_retreats(evicted: Unit[], inputs: Inputs) {
+    let retreats = [];
+
+    for (let team in inputs) {
+        for (let raw of inputs[team]) {
+            let match = /((.*)RETREAT(.*)|(.*)DESTROY)\s+->(.*)/.exec(raw);
+            if (match == null) throw error(`failed to match retreat: ${raw} `);
+
+            let result = match[5].trim();
+            if (match[2]) {
+                let rawSrc = match[2].trim();
+                let rawDst = match[3].trim();
+
+                let src = europe.regions.find(r => r.name == rawSrc);
+                if (src == null) throw error(`failed to find region for retreat: ${raw}`);
+
+                let dst = europe.regions.find(r => r.name == rawDst);
+                if (dst == null) throw error(`failed to find region for retreat: ${raw}`);
+
+                let unit = evicted.find(u => u.region == src && u.team == team);
+                if (unit == null) throw error(`failed to find unit for retreat: ${raw} ${team}`);
+
+                retreats.push({ unit, target: dst, resolved: result == 'resolved' });
+            } else {
+                let rawRegion = match[4].trim();
+
+                let region = europe.regions.find(r => r.name == rawRegion);
+                if (region == null) throw error(`failed to find region for retreat: ${raw}`);
+
+                let unit = [...evicted].find(u => u.region == region && u.team == team);
+                if (unit == null) throw error(`failed to find unit for retreat: ${raw} ${team}`);
+
+                retreats.push({ unit, target: null, resolved: result == 'resolved' });
+            }
+        }
+    }
+
+    return retreats;
+}
+
+export function parse_builds(game: GameState, inputs: Inputs) {
+    let builds = [];
+
+    for (let team in inputs) {
+        for (let raw of inputs[team]) {
+            let match = /(BUILD\s+(fleet|army)\s+(.*)|(.*)DESTROY)\s+->(.*)/.exec(raw);
+            if (match == null) throw error(`failed to match build: ${raw}`);
+
+            let result = match[5].trim();
+
+            if (match[2]) {
+                let type = match[2].trim();
+                let rawRegion = match[3].trim();
+
+                let region = europe.regions.find(r => r.name == rawRegion);
+                if (region == null) throw error(`failed to find region for build: ${raw}`);
+
+                let unit = new Unit(region, type == 'fleet' ? UnitType.Water : UnitType.Land, team);
+
+                builds.push({ unit, resolved: result == 'resolved' });
+            } else {
+                let rawRegion = match[4].trim();
+
+                let region = europe.regions.find(r => r.name == rawRegion);
+                if (region == null) throw error(`failed to find region for build: ${raw}`);
+
+                let unit = [...game.units].find(u => u.region == region && u.team == team);
+                if (unit == null) {
+                    if (result != 'resolved') continue;
+                    else throw error(`failed to find unit for build: ${raw} ${team}`);
+                }
+
+                builds.push({ unit, resolved: result == 'resolved' });
+            }
+        }
+    }
+
+    return builds;
 }
