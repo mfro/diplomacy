@@ -173,9 +173,12 @@ export async function run() {
                     fs.writeFileSync(outputFile, data);
                 }
 
-                ++newKnown.count;
+                if (errors == 0) {
+                    ++newKnown.count;
+                }
             } catch (e) {
                 ++errors;
+                fs.appendFileSync('errors.txt', `${id} ${e}`, 'utf8');
                 console.error(id, e);
             }
         }
