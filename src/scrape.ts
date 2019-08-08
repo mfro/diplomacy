@@ -106,7 +106,7 @@ export async function get_game(id: number) {
         turns.push(turn);
     }
 
-    if ((builds == 0 || retreats == 0) && turns.length > 4)
+    if (builds == 0 && turns.length > 4)
         throw error(`No builds while parsing ${id}`);
 
     return turns;
