@@ -78,12 +78,14 @@ export async function get_game(id: number) {
     let turns = [];
     let history = await game_history(`game_id=${id}`);
 
+    let builds = 0, retreats = 0;
+
     for (let content of history.split('</br></br>')) {
         let date = turns.length;
         let turn: Turn = { orders: {} };
 
         let found = false;
-        for (let match of matches(/<a href='game_history\.php\?game_id=(\d+)&phase=(\w)&gdate=(\d+)/, content)) {
+        for (let match of matches(/<b><a href='game_history\.php\?game_id=(\d+)&phase=(\w)&gdate=(\d+)'>[^<]+<\/a><\/b>&nbsp;&nbsp;/, content)) {
             if (id != parseInt(match[1])) throw error(`Failed to parse game history: ${id}`);
             if (date != parseInt(match[3])) throw error(`Failed to parse game history: ${id}`);
 
@@ -94,8 +96,8 @@ export async function get_game(id: number) {
             found = true;
             switch (phase) {
                 case 'O': turn.orders = inputs || {}; break;
-                case 'R': turn.retreats = inputs; break;
-                case 'B': turn.builds = inputs; break;
+                case 'R': turn.retreats = inputs; ++retreats; break;
+                case 'B': turn.builds = inputs; ++builds; break;
             }
         }
 
@@ -103,6 +105,9 @@ export async function get_game(id: number) {
 
         turns.push(turn);
     }
+
+    if ((builds == 0 || retreats == 0) && turns.length > 4)
+        throw error(`No builds while parsing ${id}`);
 
     return turns;
 }
@@ -120,9 +125,28 @@ export async function get_page(page: number) {
     return [...ids];
 }
 
-export function read_game(raw: Buffer): Turn[] {
+export function read_game(raw: Buffer) {
     let data = zlib.gunzipSync(raw);
-    return JSON.parse(data.toString('utf8'));
+    let game = JSON.parse(data.toString('utf8')) as Turn[];
+
+    for (let turn of game) {
+        if (turn.builds && Object.keys(turn.builds).length == 0) {
+            delete turn.builds;
+        }
+        if (turn.retreats && Object.keys(turn.retreats).length == 0) {
+            delete turn.retreats;
+        }
+        if (Object.keys(turn.orders).length == 0) {
+            // sometimes games have an empty last turn with no orders
+            if (turn.builds || turn.retreats
+                || game.indexOf(turn) + 1 != game.length)
+                throw error(`missing orders: ${game.indexOf(turn)}`);
+            game.pop();
+            break;
+        }
+    }
+
+    return game;
 }
 
 export function write_game(turns: Turn[]) {
@@ -218,7 +242,7 @@ export async function check() {
 
         for (let content of history.split('</br></br>')) {
             let found = false;
-            for (let _ of matches(/<a href='game_history\.php\?game_id=(\d+)&phase=(\w)&gdate=(\d+)/, content)) {
+            for (let _ of matches(/<b><a href='game_history\.php\?game_id=(\d+)&phase=(\w)&gdate=(\d+)'>[^<]+<\/a><\/b>&nbsp;&nbsp;/, content)) {
                 found = true;
                 break;
             }

@@ -14,7 +14,7 @@ function* matches(regex: RegExp, target: string) {
         yield match;
 }
 
-const ignored_games = new Set([159594, 158093]);
+const ignored_games = new Set([159594, 158093, 147485]);
 
 function run_game(id: number, turns: scrape.Turn[]) {
     let game = new GameState(europe, []);
@@ -42,6 +42,7 @@ function run_game(id: number, turns: scrape.Turn[]) {
         for (let order of orders) {
             if (order.type == 'move') {
                 if (local.resolved.includes(order) != remote.resolved.includes(order)) {
+                    console.log(order);
                     debugger;
                     resolve(orders);
                     throw error(`Mismatch in game ${id}`);
@@ -98,6 +99,7 @@ async function run() {
 
     for (let id of allIds) {
         if (id == 'known.json') continue;
+        if (ignored_games.has(parseInt(id))) continue;
 
         console.log(`processing game ${id}`);
 
