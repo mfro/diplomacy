@@ -170,51 +170,30 @@ export async function run() {
     fs.mkdirpSync('data');
     fs.mkdirpSync('cache');
 
-    let known: number[] = fs.readJSONSync('data/known.json');
     let errors = 0;
-
-    let known_skipped = known.length == 0;
 
     for (let i = 1; i <= 1000 && errors < 10; ++i) {
         console.log(`fetching page ${i}:`)
         let ids = await get_page(i);
 
         for (let id of ids) {
-            if (id == known[0]) {
-                known_skipped = true;
-
-                let skip = Math.floor(known.length / 15) - 1;
-                console.log(`found known, skipping ${skip} pages (${known.length} games)`);
-                i += skip;
-
-                if (skip > 0)
-                    break;
-                continue;
-            }
-
             console.log(`fetching game ${id}`)
             try {
-                let game = await get_game(id);
-                let data = write_game(game);
-                let parsed = read_game(data);
+                let outputFile = `data/${id}`;
+                if (!fs.pathExistsSync(outputFile)) {
+                    let game = await get_game(id);
+                    let data = write_game(game);
+                    let parsed = read_game(data);
 
-                if (JSON.stringify(parsed) != JSON.stringify(game))
-                    throw error('game encoding failed')
+                    if (JSON.stringify(parsed) != JSON.stringify(game))
+                        throw error('game encoding failed')
 
-                fs.writeFileSync(`data/${id}`, data);
-
-                if (errors == 0 && !known.includes(id)) {
-                    if (known_skipped)
-                        known.push(id);
-                    else
-                        known.unshift(id);
+                    fs.writeFileSync(outputFile, data);
                 }
             } catch (e) {
                 ++errors;
                 console.error(id, e);
             }
         }
-
-        fs.writeJSONSync('data/known.json', known);
     }
 }
