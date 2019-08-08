@@ -262,13 +262,14 @@ export async function check() {
         }
 
         if (builds == 0 || retreats == 0) {
-            let game = await get_game(parseInt(id));
-            let data = write_game(game);
-            fs.writeFileSync(`data/${id}`, data);
+            game = await get_game(parseInt(id));
             console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns} *`);
         } else {
             console.log(`${(++count).toString().padStart(allIds.length.toString().length)} / ${allIds.length} ${id} ${turns}`);
         }
+
+        let data = write_game(game);
+        fs.writeFileSync(`data/${id}`, data);
     }
 }
 
