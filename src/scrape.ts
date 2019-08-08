@@ -94,8 +94,8 @@ export async function get_game(id: number) {
             found = true;
             switch (phase) {
                 case 'O': turn.orders = inputs || {}; break;
-                case 'R': turn.retreats = inputs;  break;
-                case 'B': turn.builds = inputs;  break;
+                case 'R': turn.retreats = inputs; break;
+                case 'B': turn.builds = inputs; break;
             }
         }
 
@@ -246,9 +246,9 @@ export async function check() {
             ++turns;
         }
 
-        if (turns != game.length || turns == 0) {
+        if (turns != game.length) {
             game = await get_game(parseInt(id));
-            if (turns != game.length || turns == 0) {
+            if (turns != game.length) {
                 throw error(`Mismatch: ${id} ${turns} ${game.length}`);
             }
         }
