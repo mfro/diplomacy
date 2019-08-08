@@ -47,12 +47,9 @@ async function game_history(query: string) {
 
 async function get_history(id: number, phase: string, date: number) {
     let query = `game_id=${id}&phase=${phase}&gdate=${date}`;
-    return await game_history(query);
-}
+    let data = await game_history(query);
 
-export async function get_orders(id: number, date: number) {
-    let data = await get_history(id, 'O', date);
-    let orders: Inputs = {};
+    let inputs: Inputs = {};
 
     for (let match of matches(/<b>(\w+)<\/b><ul>(.*?)<\/ul>/, data)) {
         let team = match[1];
@@ -62,48 +59,10 @@ export async function get_orders(id: number, date: number) {
             list.push(part[1]);
         }
 
-        orders[team] = list;
+        inputs[team] = list;
     }
 
-    return orders;
-}
-
-export async function get_retreats(id: number, date: number) {
-    let data = await get_history(id, 'R', date);
-
-    let retreats: Inputs = {};
-
-    for (let match of matches(/<b>(\w+)<\/b><ul>(.*?)<\/ul>/, data)) {
-        let team = match[1];
-        let list = [];
-
-        for (let part of matches(/<li>(.*?)<\/li>/, match[2])) {
-            list.push(part[1]);
-        }
-
-        retreats[team] = list;
-    }
-
-    return retreats;
-}
-
-export async function get_builds(id: number, date: number) {
-    let data = await get_history(id, 'B', date);
-
-    let builds: Inputs = {};
-
-    for (let match of matches(/<b>(\w+)<\/b><ul>(.*?)<\/ul>/, data)) {
-        let team = match[1];
-        let list = [];
-
-        for (let part of matches(/<li>(.*?)<\/li>/, match[2])) {
-            list.push(part[1]);
-        }
-
-        builds[team] = list;
-    }
-
-    return builds;
+    return inputs;
 }
 
 export async function get_game(id: number) {
@@ -112,9 +71,7 @@ export async function get_game(id: number) {
 
     for (let content of history.split('</br></br>')) {
         let date = turns.length;
-        let turn: Turn = {
-            orders: {},
-        };
+        let turn: Turn = { orders: {} };
 
         let found = false;
         for (let match of matches(/<a href='game_history\.php\?game_id=(\d+)&phase=(\w)&gdate=(\d+)/, content)) {
@@ -122,16 +79,12 @@ export async function get_game(id: number) {
             if (date != parseInt(match[3])) throw error(`Failed to parse game history: ${id}`);
 
             found = true;
-            switch (match[2]) {
-                case 'O':
-                    turn.orders = await get_orders(id, date);
-                    break;
-                case 'R':
-                    turn.retreats = await get_retreats(id, date);
-                    break;
-                case 'B':
-                    turn.builds = await get_builds(id, date);
-                    break;
+            let phase = match[2];
+            let inputs = await get_history(id, phase, date);
+            switch (phase) {
+                case 'O': turn.orders = inputs; break;
+                case 'R': turn.retreats = inputs; break;
+                case 'B': turn.builds = inputs; break;
             }
         }
 
@@ -175,12 +128,19 @@ export async function run() {
     let newKnown = { newest: 0, count: 0 };
     try {
         oldKnown = fs.readJSONSync('data/known.json') as typeof newKnown;
+        console.log(`known: ${oldKnown.newest} +${oldKnown.count}`);
     } catch (e) {
         oldKnown = null;
     }
 
+    let skip = 0
     for (let i = 1; i <= 1000 && errors < 10; ++i) {
-        console.log(`fetching page ${i}:`)
+        if (skip >= 15) {
+            skip -= 15;
+            continue;
+        }
+
+        console.log(`fetching page ${i}`)
         let ids = await get_page(i);
 
         for (let id of ids) {
@@ -188,18 +148,15 @@ export async function run() {
                 newKnown.newest = id;
 
             if (oldKnown && id == oldKnown.newest) {
-                let skip = Math.floor(oldKnown.count / 15) - 1;
-                i += skip;
+                skip = oldKnown.count;
+                newKnown.count += oldKnown.count;
+                oldKnown = null;
+            }
 
-                console.log(`found known, skipping to page ${i + 1} (${oldKnown.count} games)`);
-
-                if (skip == 0) {
-                    oldKnown = null;
-                } else {
-                    newKnown.count += oldKnown.count;
-                    oldKnown = null;
-                    break;
-                }
+            if (skip >= 1) {
+                skip -= 1;
+                console.log(`skipping game ${id}`)
+                continue;
             }
 
             console.log(`fetching game ${id}`)
