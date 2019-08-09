@@ -14,7 +14,19 @@ function* matches(regex: RegExp, target: string) {
         yield match;
 }
 
-const ignored_games = new Set([159594, 158093, 151387, 147485, 152046, 151325, 153104, 153152, 153323, 153349, 154242, 154944, 155422, 155463]);
+const ignored_games = new Set([
+    150551, // Fall 1905 incorrect judgement
+    152046, // Fall 1904 invalid build/destroy inputs
+    153104, // Spring 1905 retreat to occupied munich (PARSING ERROR, should have ignored spring 1905 retreat because it was not concluded)
+    153323, // Fall 1903 invalid build/destroy inputs
+    153349, // Fall 1904 invalid build/destroy inputs
+    154242, // Fall 1904 invalid build/destroy inputs
+    154944, // Fall 1902 invalid build/destroy inputs
+    155422, // Spring 1903 english fleet in irish sea becomes italian
+    141931, // Spring 1901 invalid order inputs
+    143505, // Spring 1904 turkish fleet in aegean sea becomes austrian
+    144582, // Spring 1913 frenche fleet in kiel becomes russian
+]);
 const teams = new Set(['ENGLAND', 'FRANCE', 'GERMANY', 'ITALY', 'AUSTRIA', 'RUSSIA', 'TURKEY']);
 
 const totals = { checked: 0, skipped_via: 0, skipped_team: 0 };

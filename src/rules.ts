@@ -237,7 +237,8 @@ export function resolve(orders: AnyOrder[]) {
                     let enemies = support.filter(o => o.unit.team != current!.unit.team);
                     let currentRoutes = findRoutes(current);
 
-                    if (currentRoutes != null && currentRoutes.paths.length == 1 && routes.paths.length == 1) {
+                    // to fail to swap places, both must have no routes via convoy
+                    if (currentRoutes != null && currentRoutes.paths.filter(o => o.length > 0).length == 0 && routes.paths.filter(o => o.length > 0).length == 0) {
                         let currentAttack = findMoveSupport(current).filter(o => o.unit.team != attack.unit.team);
                         if (currentAttack.length > enemies.length)
                             continue;
