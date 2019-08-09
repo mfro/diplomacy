@@ -11,6 +11,10 @@ export class HoldOrder implements OrderBase<'hold'> {
     constructor(
         readonly unit: Unit,
     ) { }
+
+    toString() {
+        return `${this.unit.team} ${this.unit.region.name} hold`;
+    }
 }
 
 export class MoveOrder implements OrderBase<'move'> {
@@ -20,6 +24,12 @@ export class MoveOrder implements OrderBase<'move'> {
         readonly target: Region,
         readonly requireConvoy: boolean,
     ) { }
+
+    toString() {
+        let text = `${this.unit.team} ${this.unit.region.name} move -> ${this.target.name}`;
+        if (this.requireConvoy) text += ` via convoy`;
+        return text;
+    }
 }
 
 export class SupportOrder implements OrderBase<'support'> {
@@ -29,6 +39,13 @@ export class SupportOrder implements OrderBase<'support'> {
         readonly target: Region,
         readonly attack?: Region,
     ) { }
+
+    toString() {
+        let text = `${this.unit.team} ${this.unit.region.name} support ${this.target.name}`;
+        if (this.attack) text += ` -> ${this.attack.name}`;
+        else text += ` to hold`;
+        return text;
+    }
 }
 
 export class ConvoyOrder implements OrderBase<'convoy'> {
@@ -38,6 +55,10 @@ export class ConvoyOrder implements OrderBase<'convoy'> {
         readonly start: Region,
         readonly end: Region,
     ) { }
+
+    toString() {
+        return `${this.unit.team} ${this.unit.region.name} convoy ${this.start.name} to ${this.end.name}`;
+    }
 }
 
 export type AnyOrder = HoldOrder | MoveOrder | SupportOrder | ConvoyOrder;
@@ -152,10 +173,24 @@ export function resolve(orders: AnyOrder[]) {
         orders.splice(i, 1, new HoldOrder(dump.unit));
     }
 
-    let checked = new Set<AnyOrder>();
     let passed = new Set<AnyOrder>();
+    let checked = new Set<AnyOrder>();
+    let reasons = new Map<AnyOrder, string>();
 
     let stack: AnyOrder[] = [];
+
+    function fail(order: AnyOrder, reason: string): false {
+        stack.pop();
+        reasons.set(order, reason);
+        return false;
+    }
+
+    function pass(order: AnyOrder): true {
+        stack.pop();
+        passed.add(order);
+        return true;
+    }
+
     function resolve(order: AnyOrder): boolean {
         if (stack[0] == order && stack.every(o => o.type == 'move') && stack.length > 2) {
             return true;
@@ -170,168 +205,167 @@ export function resolve(orders: AnyOrder[]) {
         if (stack.includes(order))
             throw error(`recursive resolve`);
 
-        try {
-            stack.push(order);
+        stack.push(order);
 
-            if (order.type == 'hold') {
-                passed.add(order);
-                return true;
-            }
-
-            if (order.type == 'move') {
-                let current = orders.find(o => Region.areSame(o.unit.region, order.target));
-
-                let best: MoveOrder[] = [];
-                let strength = 0;
-
-                let bestDislodge: MoveOrder[] = [];
-                let dislodgeStrength = 0;
-
-                let forceResolved: MoveOrder | null = null;
-
-                for (let attack of orders) {
-                    if (attack.type != 'move' || !Region.areSame(attack.target, order.target))
-                        continue;
-
-                    let routes = findRoutes(attack);
-                    if (routes == null)
-                        continue;
-
-                    let support = findMoveSupport(attack);
-
-                    if (current && current.type == 'move' && Region.areSame(current.target, attack.unit.region)) {
-                        //  prevent dislodged unit from bouncing with other units entering dislodger's region
-                        let enemies = support.filter(o => o.unit.team != current!.unit.team);
-                        let currentRoutes = findRoutes(current);
-                        if (currentRoutes != null && currentRoutes.convoys.length == 0 && routes.convoys.length == 0) {
-                            let currentAttack = findMoveSupport(current).filter(o => o.unit.team != attack.unit.team);
-                            if (currentAttack.length > enemies.length)
-                                continue;
-                        } else {
-                            forceResolved = attack;
-                        }
-                    }
-
-                    if (support.length > strength) {
-                        best = [attack];
-                        strength = support.length;
-                    } else if (support.length == strength) {
-                        best.push(attack);
-                    }
-
-                    if (current && attack.unit.team != current.unit.team) {
-                        let enemies = support.filter(o => o.unit.team != current!.unit.team);
-                        if (enemies.length > dislodgeStrength) {
-                            bestDislodge = [attack];
-                            dislodgeStrength = enemies.length;
-                        } else if (enemies.length == dislodgeStrength) {
-                            bestDislodge.push(attack);
-                        }
-                    }
-                }
-
-                if (best.length != 1)
-                    return false;
-
-                if (best[0] != order)
-                    return false;
-
-                if (current && best[0] != forceResolved) {
-                    if (current.type == 'move' && Region.areSame(current.target, best[0].unit.region)) {
-                        if (bestDislodge.length != 1 || best[0] != bestDislodge[0])
-                            return false;
-
-                        let currentAttack = findMoveSupport(current).filter(o => o.unit.team != best[0].unit.team);
-                        if (currentAttack.length == dislodgeStrength)
-                            return false;
-                        if (currentAttack.length > dislodgeStrength)
-                            throw error('Failed to filter out dislodged attack');
-                    } else if (current.type != 'move' || !resolve(current)) {
-                        if (bestDislodge.length != 1 || best[0] != bestDislodge[0])
-                            return false;
-
-                        if (findHoldSupport(current).length >= dislodgeStrength)
-                            return false;
-                    }
-                }
-
-                passed.add(order);
-                return true;
-            }
-
-            if (order.type == 'convoy') {
-                if (order.unit.region.type != UnitType.Water)
-                    return false;
-
-                let target = orders.find(o => o.type == 'move'
-                    && Region.areSame(o.unit.region, order.start)
-                    && Region.areSame(o.target, order.end));
-                if (target == null)
-                    return false;
-
-                for (let attack of orders) {
-                    if (attack.type != 'move' || !Region.areSame(attack.target, order.unit.region))
-                        continue;
-
-                    if (resolve(attack))
-                        return false;
-                }
-
-                passed.add(order);
-                return true;
-            }
-
-            if (order.type == 'support') {
-                let supportee = orders.find(o => Region.areSame(o.unit.region, order.target));
-                if (supportee == null)
-                    return false;
-
-                if (order.attack) {
-                    if (supportee.type != 'move'
-                        || !canReach(order.unit, order.attack)
-                        || !Region.areEqual(supportee.target, order.attack))
-                        return false;
-                } else {
-                    if (supportee.type == 'move'
-                        || !canReach(order.unit, order.target))
-                        return false;
-                }
-
-                for (let attack of orders) {
-                    if (attack.type != 'move' || !Region.areSame(attack.target, order.unit.region))
-                        continue;
-
-                    if (order.unit.team == attack.unit.team)
-                        continue;
-
-                    if (supportee.type == 'move') {
-                        if (Region.areSame(supportee.target, attack.unit.region)) {
-                            // if it is from the target region of the supported attack,
-                            // it can only cut support by dislodging
-                            if (findMoveSupport(attack).length > findHoldSupport(order).length)
-                                return false;
-                        } else {
-                            // if it is convoyed by the target region of the supported attack,
-                            // it can only cut support if it has an alternate path
-                            let routes = findRoutes(attack, supportee.target);
-                            if (routes != null)
-                                return false;
-                        }
-                    } else {
-                        let routes = findRoutes(attack);
-                        if (routes != null)
-                            return false;
-                    }
-                }
-
-                passed.add(order);
-                return true;
-            }
-
-            throw error(`Invalid order`);
-        } finally {
-            stack.pop();
+        if (order.type == 'hold') {
+            return pass(order);
         }
+
+        if (order.type == 'move') {
+            let current = orders.find(o => Region.areSame(o.unit.region, order.target));
+
+            let best: MoveOrder[] = [];
+            let strength = 0;
+
+            let bestDislodge: MoveOrder[] = [];
+            let dislodgeStrength = 0;
+
+            let forceResolved: MoveOrder | null = null;
+
+            for (let attack of orders) {
+                if (attack.type != 'move' || !Region.areSame(attack.target, order.target))
+                    continue;
+
+                let routes = findRoutes(attack);
+                if (routes == null)
+                    continue;
+
+                let support = findMoveSupport(attack);
+
+                if (current && current.type == 'move' && Region.areSame(current.target, attack.unit.region)) {
+                    //  prevent dislodged unit from bouncing with other units entering dislodger's region
+                    let enemies = support.filter(o => o.unit.team != current!.unit.team);
+                    let currentRoutes = findRoutes(current);
+
+                    if (currentRoutes != null && currentRoutes.paths.length == 1 && routes.paths.length == 1) {
+                        let currentAttack = findMoveSupport(current).filter(o => o.unit.team != attack.unit.team);
+                        if (currentAttack.length > enemies.length)
+                            continue;
+                    } else {
+                        forceResolved = attack;
+                    }
+                }
+
+                if (support.length > strength) {
+                    best = [attack];
+                    strength = support.length;
+                } else if (support.length == strength) {
+                    best.push(attack);
+                }
+
+                if (current && attack.unit.team != current.unit.team) {
+                    let enemies = support.filter(o => o.unit.team != current!.unit.team);
+                    if (enemies.length > dislodgeStrength) {
+                        bestDislodge = [attack];
+                        dislodgeStrength = enemies.length;
+                    } else if (enemies.length == dislodgeStrength) {
+                        bestDislodge.push(attack);
+                    }
+                }
+            }
+
+            if (!best.includes(order))
+                return fail(order, `Overpowered by ${best.join(', ')} with strength ${strength} vs ${findMoveSupport(order).length} `);
+
+            if (best.length != 1)
+                return fail(order, `Standoff with ${best.join(', ')} with strength ${strength} `);
+
+            if (current && best[0] != forceResolved) {
+                if (current.type == 'move' && Region.areSame(current.target, best[0].unit.region)) {
+                    if (bestDislodge.length != 1 || best[0] != bestDislodge[0])
+                        return fail(order, `Avoiding self-dislodgement`);
+
+                    let currentAttack = findMoveSupport(current).filter(o => o.unit.team != best[0].unit.team);
+                    if (currentAttack.length == dislodgeStrength)
+                        return fail(order, `Balanced faceoff ${currentAttack.join(', ')} vs ${findMoveSupport(order).filter(o => o.unit.team != current!.unit.team).join(', ')}`);
+
+                    if (currentAttack.length > dislodgeStrength)
+                        throw error('Failed to filter out dislodged attack');
+                } else if (current.type != 'move' || !resolve(current)) {
+                    if (bestDislodge.length != 1 || best[0] != bestDislodge[0])
+                        return fail(order, `Avoiding self-dislodgement`);
+
+                    let holdSupport = findHoldSupport(current);
+                    if (holdSupport.length >= dislodgeStrength)
+                        return fail(order, `Held with ${holdSupport.join(', ')} vs ${findMoveSupport(order).filter(o => o.unit.team != current!.unit.team).join(', ')}`);
+                }
+            }
+
+            return pass(order);
+        }
+
+        if (order.type == 'convoy') {
+            if (order.unit.region.type != UnitType.Water)
+                return fail(order, 'Only water units can convoy');
+
+            let target = orders.find(o => o.type == 'move'
+                && o.unit.type == UnitType.Land
+                && Region.areSame(o.unit.region, order.start)
+                && Region.areSame(o.target, order.end));
+            if (target == null)
+                return fail(order, 'No matching target');
+
+            for (let attack of orders) {
+                if (attack.type != 'move' || !Region.areSame(attack.target, order.unit.region))
+                    continue;
+
+                if (resolve(attack))
+                    return fail(order, `Dislodged by ${attack} `);
+            }
+
+            return pass(order);
+        }
+
+        if (order.type == 'support') {
+            let supportee = orders.find(o => Region.areSame(o.unit.region, order.target));
+            if (supportee == null)
+                return fail(order, 'No matching target');
+
+            if (order.attack) {
+                if (supportee.type != 'move')
+                    return fail(order, `Support attacked ${order.attack.name} target was ${supportee}`);
+                if (!canReach(order.unit, order.attack))
+                    return fail(order, `Support attacked ${order.attack.name} but could not reach`);
+                if (!Region.areEqual(supportee.target, order.attack))
+                    return fail(order, `Support attacked ${order.attack.name} but target attacked ${supportee.target}`);
+            } else {
+                if (supportee.type == 'move')
+                    return fail(order, `Support held but target was ${supportee}`);
+                if (!canReach(order.unit, order.target))
+                    return fail(order, `Support held ${order.target.name} but could not reach`);
+            }
+
+            for (let attack of orders) {
+                if (attack.type != 'move' || !Region.areSame(attack.target, order.unit.region))
+                    continue;
+
+                if (order.unit.team == attack.unit.team)
+                    continue;
+
+                if (supportee.type == 'move') {
+                    if (Region.areSame(supportee.target, attack.unit.region)) {
+                        // if it is from the target region of the supported attack,
+                        // it can only cut support by dislodging
+                        if (resolve(attack))
+                            return fail(order, `Dislodged by ${attack}`);
+                    } else {
+                        // if it is convoyed by the target region of the supported attack,
+                        // it can only cut support if it has an alternate path
+                        let routes = findRoutes(attack, supportee.target);
+                        if (routes != null)
+                            return fail(order, `Disrupted by ${attack}`);
+                    }
+                } else {
+                    let routes = findRoutes(attack);
+                    if (routes != null)
+                        return fail(order, `Disrupted by ${attack}`);
+                }
+            }
+
+            return pass(order);
+        }
+
+        throw error(`Invalid order`);
     }
 
     let evicted: Unit[] = [];
@@ -351,5 +385,5 @@ export function resolve(orders: AnyOrder[]) {
         }
     }
 
-    return { resolved, evicted };
+    return { resolved, evicted, reasons };
 }
