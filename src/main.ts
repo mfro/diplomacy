@@ -25,7 +25,10 @@ const ignored_games = new Set([
     155422, // Spring 1903 english fleet in irish sea becomes italian
     141931, // Spring 1901 invalid order inputs
     143505, // Spring 1904 turkish fleet in aegean sea becomes austrian
-    144582, // Spring 1913 frenche fleet in kiel becomes russian
+    144582, // Spring 1913 french fleet in kiel becomes russian
+    139460, // idek
+    139815, // Spring 1914 spain
+    141277, // Fall 1901 messed up convoy stuff
 ]);
 const teams = new Set(['ENGLAND', 'FRANCE', 'GERMANY', 'ITALY', 'AUSTRIA', 'RUSSIA', 'TURKEY']);
 

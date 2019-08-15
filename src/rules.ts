@@ -286,6 +286,9 @@ export function resolve(orders: AnyOrder[]) {
                     if (bestDislodge.length != 1 || best[0] != bestDislodge[0])
                         return fail(order, `Avoiding self-dislodgement`);
 
+                    if (dislodgeStrength == 0)
+                        return fail(order, `Held with ?? vs nothing`);
+
                     let holdSupport = findHoldSupport(current);
                     if (holdSupport.length >= dislodgeStrength)
                         return fail(order, `Held with ${holdSupport.join(', ')} vs ${findMoveSupport(order).filter(o => o.unit.team != current!.unit.team).join(', ')}`);
