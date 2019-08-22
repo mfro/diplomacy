@@ -1,5 +1,5 @@
-import { Unit, Region, UnitType } from "./game";
-import { error } from "./util";
+import { Unit, Region, UnitType } from './game';
+import { error } from './util';
 
 interface OrderBase<T extends string> {
     readonly type: T,

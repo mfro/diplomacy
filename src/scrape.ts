@@ -2,6 +2,7 @@ import zlib from 'zlib';
 
 import fs from 'fs-extra';
 import request from 'request-promise-native';
+
 import { error, matches } from './util';
 import { GameState, Unit, UnitType } from './game';
 import { REGIONS, europe } from './data';

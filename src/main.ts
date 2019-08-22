@@ -7,13 +7,6 @@ import { AnyOrder, MoveOrder, HoldOrder, SupportOrder, ConvoyOrder, resolve } fr
 import * as scrape from './scrape';
 import { error } from './util';
 
-function* matches(regex: RegExp, target: string) {
-    let copy = new RegExp(regex, 'g');
-    let match;
-    while (match = copy.exec(target))
-        yield match;
-}
-
 const ignored_games = new Set([
     150551, // Fall 1905 incorrect judgement
     152046, // Fall 1904 invalid build/destroy inputs
