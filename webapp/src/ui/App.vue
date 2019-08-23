@@ -33,7 +33,12 @@
             <pre class="grow ma-2 mx-3">{{ state.orders.join('\n') }}</pre>
             <v-divider />
             <v-card-actions key="2">
-              <v-btn color="primary" v-if="!readonly" :disabled="state.orders.length == 0" @click="resolve()">Resolve Orders</v-btn>
+              <v-btn
+                color="primary"
+                v-if="!readonly"
+                :disabled="state.orders.length == 0"
+                @click="resolve()"
+              >Resolve Orders</v-btn>
               <v-btn color="primary" v-else @click="restore()">Restore</v-btn>
               <v-spacer />
               <v-btn color="secondary" text v-if="index > 0" @click="preview(index - 1)">Back</v-btn>
@@ -77,38 +82,26 @@
             <v-card-title class="title">
               <span>What order for the {{ getUnitTypeString(build.unitType) }} in {{ build.unitRegion.name }}?</span>
             </v-card-title>
-            <v-card-actions key="5">
-              <v-layout justify-space-around>
-                <v-btn text color="primary" @click="setOrderType('hold')">Hold</v-btn>
-                <v-btn text color="primary" @click="setOrderType('move')">Move</v-btn>
-                <v-btn text color="primary" @click="setOrderType('convoy')" v-if="canConvoy">Convoy</v-btn>
-                <v-btn text color="primary" @click="setOrderType('support')">Support</v-btn>
-              </v-layout>
-            </v-card-actions>
-          </v-card>
-
-          <v-card v-else-if="build.orderType == 'move'" class="ma-3">
-            <v-card-title class="title">
-              <span>Select a target region</span>
-            </v-card-title>
+            <v-card-text class="text--primary">
+              <p>Left click to give a move or hold order</p>
+              <p>Right click to give a support order</p>
+              <p>Right click twice to give a convoy order</p>
+            </v-card-text>
           </v-card>
 
           <v-card v-else-if="build.orderType == 'convoy'" class="ma-3">
-            <v-card-title class="title" v-if="build.orderRegion === null">
-              <span>Select a region to convoy</span>
-            </v-card-title>
-            <v-card-title v-else>
-              <span>Select a destination region</span>
+            <v-card-title>
+              <span>Select a convoy destination</span>
             </v-card-title>
           </v-card>
 
           <v-card v-else-if="build.orderType == 'support'" class="ma-3">
-            <v-card-title class="title" v-if="build.orderRegion === null">
-              <span>Select a region to support</span>
+            <v-card-title>
+              <span>Select a support destination</span>
             </v-card-title>
-            <v-card-title v-else>
-              <span>Select a destination region</span>
-            </v-card-title>
+            <v-card-text class="text--primary">
+              <p>Right click again to give a convoy order</p>
+            </v-card-text>
           </v-card>
         </div>
 
@@ -230,20 +223,20 @@ export default {
     },
 
     async click([region, button, pos]) {
-      if (button == 2) {
-        let i = this.state.units.findIndex(o => Region.areSame(o.region, region));
-        if (i < 0) return;
-
-        let unit = this.state.units.splice(i, 1)[0];
-
-        let i2 = this.state.orders.findIndex(o => o.unit == unit);
-        if (i2 < 0) return this.reset();
-
-        this.state.orders.splice(i2, 1);
-        return this.reset();
-      }
-
       if (this.build.unitRegion === null) {
+        if (button == 2) {
+          let i = this.state.units.findIndex(o => Region.areSame(o.region, region));
+          if (i < 0) return;
+
+          let unit = this.state.units.splice(i, 1)[0];
+
+          let i2 = this.state.orders.findIndex(o => o.unit == unit);
+          if (i2 < 0) return this.reset();
+
+          this.state.orders.splice(i2, 1);
+          return this.reset();
+        }
+
         let unit = this.state.units.find(o => Region.areSame(o.region, region));
         if (unit == null) {
           region = await this.resolveRegionOptions(region);
@@ -264,29 +257,36 @@ export default {
         return;
       }
 
-      if (this.build.orderType == 'move') {
-        if (this.build.unitType == UnitType.Water)
-          region = await this.resolveRegionOptions(region);
-        return this.emit(new MoveOrder(this.unit, region, false));
-      }
-
-      if (this.build.orderType == 'convoy') {
-        if (this.build.orderRegion === null) {
-          this.build.orderRegion = region;
-        } else {
-          return this.emit(new ConvoyOrder(this.unit, this.build.orderRegion, region));
+      if (this.unit != null) {
+        if (Region.areSame(region, this.unit.region)) {
+          return this.emit(new HoldOrder(this.unit));
         }
-      }
 
-      if (this.build.orderType == 'support') {
-        if (this.build.orderRegion === null) {
-          this.build.orderRegion = region;
-        } else {
-          if (Region.areSame(region, this.build.orderRegion)) {
-            return this.emit(new SupportOrder(this.unit, this.build.orderRegion));
+        if (button == 0) {
+          if (this.build.orderType == 'convoy') {
+            return this.emit(new ConvoyOrder(this.unit, this.build.orderRegion, region));
+          } else if (this.build.orderType == 'support') {
+            if (Region.areSame(region, this.build.orderRegion)) {
+              return this.emit(new SupportOrder(this.unit, this.build.orderRegion));
+            } else {
+              region = await this.resolveRegionOptions(region);
+              return this.emit(new SupportOrder(this.unit, this.build.orderRegion, region));
+            }
           } else {
-            region = await this.resolveRegionOptions(region);
-            return this.emit(new SupportOrder(this.unit, this.build.orderRegion, region));
+            if (this.unit.type == UnitType.Water)
+              region = await this.resolveRegionOptions(region);
+            return this.emit(new MoveOrder(this.unit, region, false));
+          }
+        }
+
+        if (button == 2) {
+          if (this.build.orderType == 'support' &&
+            Region.areSame(this.build.orderRegion, region)) {
+            this.build.orderType = 'convoy';
+            this.build.orderRegion = region;
+          } else {
+            this.build.orderType = 'support';
+            this.build.orderRegion = region;
           }
         }
       }
@@ -300,14 +300,6 @@ export default {
     setUnitType(type) {
       this.build.unitType = type ? UnitType.Water : UnitType.Land;
       this.unit;
-    },
-
-    setOrderType(type) {
-      this.build.orderType = type;
-
-      if (type == 'hold') {
-        return this.emit(new HoldOrder(this.unit));
-      }
     },
 
     emit(order) {
