@@ -1,67 +1,4 @@
-import { Unit, Region, UnitType } from './game';
-import { error } from './util';
-
-interface OrderBase<T extends string> {
-    readonly type: T,
-    readonly unit: Unit,
-}
-
-export class HoldOrder implements OrderBase<'hold'> {
-    readonly type = 'hold';
-    constructor(
-        readonly unit: Unit,
-    ) { }
-
-    toString() {
-        return `${this.unit.team} ${this.unit.region.name} hold`;
-    }
-}
-
-export class MoveOrder implements OrderBase<'move'> {
-    readonly type = 'move';
-    constructor(
-        readonly unit: Unit,
-        readonly target: Region,
-        readonly requireConvoy: boolean,
-    ) { }
-
-    toString() {
-        let text = `${this.unit.team} ${this.unit.region.name} move -> ${this.target.name}`;
-        if (this.requireConvoy) text += ` via convoy`;
-        return text;
-    }
-}
-
-export class SupportOrder implements OrderBase<'support'> {
-    readonly type = 'support';
-    constructor(
-        readonly unit: Unit,
-        readonly target: Region,
-        readonly attack?: Region,
-    ) { }
-
-    toString() {
-        let text = `${this.unit.team} ${this.unit.region.name} support ${this.target.name}`;
-        if (this.attack) text += ` -> ${this.attack.name}`;
-        else text += ` to hold`;
-        return text;
-    }
-}
-
-export class ConvoyOrder implements OrderBase<'convoy'> {
-    readonly type = 'convoy';
-    constructor(
-        readonly unit: Unit,
-        readonly start: Region,
-        readonly end: Region,
-    ) { }
-
-    toString() {
-        return `${this.unit.team} ${this.unit.region.name} convoy ${this.start.name} to ${this.end.name}`;
-    }
-}
-
-export type AnyOrder = HoldOrder | MoveOrder | SupportOrder | ConvoyOrder;
+import { Unit, Region, UnitType, AnyOrder, MoveOrder, ConvoyOrder, SupportOrder, HoldOrder } from './game';
 
 export function resolve(orders: AnyOrder[]) {
     function canMove(unit: Unit, dst: Region) {
@@ -173,6 +110,8 @@ export function resolve(orders: AnyOrder[]) {
         orders.splice(i, 1, new HoldOrder(dump.unit));
     }
 
+    let assumed = new Set<AnyOrder>();
+
     let passed = new Set<AnyOrder>();
     let checked = new Set<AnyOrder>();
     let reasons = new Map<AnyOrder, string>();
@@ -181,33 +120,44 @@ export function resolve(orders: AnyOrder[]) {
 
     function fail(order: AnyOrder, reason: string): false {
         stack.pop();
-        reasons.set(order, reason);
+        if (assumed.size == 0)
+            reasons.set(order, reason);
         return false;
     }
 
     function pass(order: AnyOrder): true {
         stack.pop();
-        passed.add(order);
+        if (assumed.size == 0)
+            passed.add(order);
         return true;
     }
 
-    function resolve(order: AnyOrder): boolean {
+    function resolve(order: AnyOrder, force = false): boolean {
         if (stack[0] == order && stack.every(o => o.type == 'move') && stack.length > 2) {
             return true;
         } else if (stack.includes(order)) {
-            throw error('recursive resolve');
+            if (stack.indexOf(order) != stack.lastIndexOf(order))
+                throw error('recursive resolve');
+        } else if (!force && assumed.size == 0) {
+            if (checked.has(order))
+                return passed.has(order);
+            checked.add(order);
         }
 
-        if (checked.has(order))
-            return passed.has(order);
-        checked.add(order);
-
-        if (stack.includes(order))
-            throw error(`recursive resolve`);
+        if (assumed.has(order))
+            return true;
 
         stack.push(order);
 
         if (order.type == 'hold') {
+            for (let attack of orders) {
+                if (attack.type != 'move' || !Region.areSame(attack.target, order.unit.region))
+                    continue;
+
+                if (resolve(attack))
+                    return fail(order, `Dislodged by '${attack}'`);
+            }
+
             return pass(order);
         }
 
@@ -227,21 +177,36 @@ export function resolve(orders: AnyOrder[]) {
                     continue;
 
                 let routes = findRoutes(attack);
-                if (routes == null)
+                if (routes == null) {
+                    if (attack == order)
+                        return fail(order, `No valid route`);
+
                     continue;
+                }
 
                 let support = findMoveSupport(attack);
 
                 if (current && current.type == 'move' && Region.areSame(current.target, attack.unit.region)) {
-                    //  prevent dislodged unit from bouncing with other units entering dislodger's region
+                    // prevent dislodged unit from bouncing with other units entering dislodger's region
                     let enemies = support.filter(o => o.unit.team != current!.unit.team);
                     let currentRoutes = findRoutes(current);
 
                     // to fail to swap places, both must have no routes via convoy
-                    if (currentRoutes != null && currentRoutes.paths.filter(o => o.length > 0).length == 0 && routes.paths.filter(o => o.length > 0).length == 0) {
-                        let currentAttack = findMoveSupport(current).filter(o => o.unit.team != attack.unit.team);
-                        if (currentAttack.length > enemies.length)
+                    if (currentRoutes == null) {
+                        if (enemies.length == 0) {
+                            if (attack == order)
+                                return fail(order, `Overpowered by '${current}' with support '' vs '${enemies.join("', '")}'`);
+
                             continue;
+                        }
+                    } else if (currentRoutes.paths.filter(o => o.length > 0).length == 0 && routes.paths.filter(o => o.length > 0).length == 0) {
+                        let currentAttack = findMoveSupport(current).filter(o => o.unit.team != attack.unit.team);
+                        if (currentAttack.length > enemies.length) {
+                            if (attack == order)
+                                return fail(order, `Overpowered by '${current}' with support '${currentAttack.join("', '")}' vs '${enemies.join("', '")}'`);
+
+                            continue;
+                        }
                     } else {
                         forceResolved = attack;
                     }
@@ -266,10 +231,10 @@ export function resolve(orders: AnyOrder[]) {
             }
 
             if (!best.includes(order))
-                return fail(order, `Overpowered by ${best.join(', ')} with strength ${strength} vs ${findMoveSupport(order).length} `);
+                return fail(order, `Overpowered by '${best.join("', '")}' with strength ${strength} vs ${findMoveSupport(order).length} `);
 
             if (best.length != 1)
-                return fail(order, `Standoff with ${best.join(', ')} with strength ${strength} `);
+                return fail(order, `Standoff with '${best.join("', '")}' with strength ${strength} `);
 
             if (current && best[0] != forceResolved) {
                 if (current.type == 'move' && Region.areSame(current.target, best[0].unit.region)) {
@@ -278,7 +243,7 @@ export function resolve(orders: AnyOrder[]) {
 
                     let currentAttack = findMoveSupport(current).filter(o => o.unit.team != best[0].unit.team);
                     if (currentAttack.length == dislodgeStrength)
-                        return fail(order, `Balanced faceoff ${currentAttack.join(', ')} vs ${findMoveSupport(order).filter(o => o.unit.team != current!.unit.team).join(', ')}`);
+                        return fail(order, `Balanced faceoff '${currentAttack.join("', '")}' vs '${findMoveSupport(order).filter(o => o.unit.team != current!.unit.team).join("', '")}'`);
 
                     if (currentAttack.length > dislodgeStrength)
                         throw error('Failed to filter out dislodged attack');
@@ -291,7 +256,7 @@ export function resolve(orders: AnyOrder[]) {
 
                     let holdSupport = findHoldSupport(current);
                     if (holdSupport.length >= dislodgeStrength)
-                        return fail(order, `Held with ${holdSupport.join(', ')} vs ${findMoveSupport(order).filter(o => o.unit.team != current!.unit.team).join(', ')}`);
+                        return fail(order, `Held with '${holdSupport.join(', ')}' vs '${findMoveSupport(order).filter(o => o.unit.team != current!.unit.team).join("', '")}'`);
                 }
             }
 
@@ -314,7 +279,7 @@ export function resolve(orders: AnyOrder[]) {
                     continue;
 
                 if (resolve(attack))
-                    return fail(order, `Dislodged by ${attack} `);
+                    return fail(order, `Dislodged by '${attack}'`);
             }
 
             return pass(order);
@@ -351,18 +316,26 @@ export function resolve(orders: AnyOrder[]) {
                         // if it is from the target region of the supported attack,
                         // it can only cut support by dislodging
                         if (resolve(attack))
-                            return fail(order, `Dislodged by ${attack}`);
+                            return fail(order, `Dislodged by '${attack}'`);
                     } else {
                         // if it is convoyed by the target region of the supported attack,
                         // it can only cut support if it has an alternate path
                         let routes = findRoutes(attack, supportee.target);
                         if (routes != null)
-                            return fail(order, `Disrupted by ${attack}`);
+                            return fail(order, `Disrupted by '${attack}'`);
+
+                        // or if the support doesn't break the convoy
+                        assumed.add(order);
+                        if (resolve(attack)) {
+                            assumed.delete(order)
+                            return fail(order, `Dislodged by '${attack}'`);
+                        }
+                        assumed.delete(order)
                     }
                 } else {
                     let routes = findRoutes(attack);
                     if (routes != null)
-                        return fail(order, `Disrupted by ${attack}`);
+                        return fail(order, `Disrupted by '${attack}'`);
                 }
             }
 
@@ -376,18 +349,32 @@ export function resolve(orders: AnyOrder[]) {
     let resolved: MoveOrder[] = [];
 
     for (let order of orders) {
-        if (order.type == 'move' && resolve(order)) {
+        let valid = resolve(order);
+
+        if (order.type == 'move' && valid) {
             resolved.push(order);
         } else {
             for (let attack of orders) {
                 if (attack.type != 'move' || !Region.areSame(attack.target, order.unit.region))
                     continue;
 
-                if (resolve(attack))
+                if (resolve(attack)) {
                     evicted.push(order.unit);
+                    if (!reasons.has(order)) {
+                        debugger;
+                        resolve(order, true);
+                        debugger;
+                        resolve(attack, true);
+                    }
+                }
             }
         }
     }
 
     return { resolved, evicted, reasons };
+}
+
+function error(msg: string) {
+    debugger;
+    return new Error(msg);
 }

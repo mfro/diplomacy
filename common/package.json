@@ -1,0 +1,15 @@
+{
+  "name": "diplomacy-common",
+  "version": "1.0.0",
+  "main": "out/main.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "rollup -c rollup.config.js",
+    "watch": "rollup -c rollup.config.js --watch"
+  },
+  "devDependencies": {
+    "rollup": "^1.17.0",
+    "rollup-plugin-typescript2": "^0.22.0",
+    "typescript": "^3.5.3"
+  }
+}

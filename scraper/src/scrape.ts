@@ -4,9 +4,7 @@ import fs from 'fs-extra';
 import request from 'request-promise-native';
 
 import { error, matches } from './util';
-import { GameState, Unit, UnitType } from './game';
-import { REGIONS, europe } from './data';
-import { HoldOrder, MoveOrder, SupportOrder, ConvoyOrder } from './rules';
+import { GameState, maps, HoldOrder, Unit, MoveOrder, SupportOrder, ConvoyOrder, UnitType } from 'diplomacy-common';
 
 export type Inputs = { [team: string]: string[] };
 
@@ -275,7 +273,7 @@ export async function check() {
 
 export function parse_orders(game: GameState, inputs: Inputs) {
     let isNew = game.units.size == 0;
-    let fleets = new Set([REGIONS.LON, REGIONS.EDI, REGIONS.BRE, REGIONS.NAP, REGIONS.KIE, REGIONS.TRI, REGIONS.ANK, REGIONS.SEV, REGIONS.STP_SOUTH]);
+    let fleets = new Set([maps.standard.regions.LON, maps.standard.regions.EDI, maps.standard.regions.BRE, maps.standard.regions.NAP, maps.standard.regions.KIE, maps.standard.regions.TRI, maps.standard.regions.ANK, maps.standard.regions.SEV, maps.standard.regions.STP_SOUTH]);
 
     let orders = [];
     let resolved = [];
@@ -310,7 +308,7 @@ export function parse_orders(game: GameState, inputs: Inputs) {
                 let moveArgs = args.split('VIA');
 
                 let rawTarget = moveArgs[0].trim();
-                let target = europe.regions.find(r => r.name == rawTarget);
+                let target = maps.standard.map.regions.find(r => r.name == rawTarget);
                 if (target == null) throw error(`failed to find target region for move order: ${args} `);
 
                 order = new MoveOrder(unit, target, moveArgs.length > 1);
@@ -320,13 +318,13 @@ export function parse_orders(game: GameState, inputs: Inputs) {
             } else if (op == 'SUPPORT') {
                 let [rawSrc, rawDst] = args.split(' to '); // 'X to hold' or 'X to Y'
 
-                let src = europe.regions.find(r => r.name == rawSrc);
+                let src = maps.standard.map.regions.find(r => r.name == rawSrc);
                 if (src == null) throw error(`failed to find target region for support order: ${rawSrc} `);
 
                 if (rawDst == 'hold')
                     order = new SupportOrder(unit, src);
                 else {
-                    let dst = europe.regions.find(r => r.name == rawDst);
+                    let dst = maps.standard.map.regions.find(r => r.name == rawDst);
                     if (dst == null) throw error(`failed to find attack region for support order: ${rawDst} `);
 
                     order = new SupportOrder(unit, src, dst);
@@ -334,10 +332,10 @@ export function parse_orders(game: GameState, inputs: Inputs) {
             } else if (op == 'CONVOY') {
                 let [rawSrc, rawDst] = args.split(' to '); // 'X to Y'
 
-                let src = europe.regions.find(r => r.name == rawSrc);
+                let src = maps.standard.map.regions.find(r => r.name == rawSrc);
                 if (src == null) throw error(`failed to find start region for convoy order: ${rawSrc} `);
 
-                let dst = europe.regions.find(r => r.name == rawDst);
+                let dst = maps.standard.map.regions.find(r => r.name == rawDst);
                 if (dst == null) throw error(`failed to find end region for convoy order: ${rawDst} `);
 
                 order = new ConvoyOrder(unit, src, dst);
@@ -366,10 +364,10 @@ export function parse_retreats(evicted: Unit[], inputs: Inputs) {
                 let rawSrc = match[2].trim();
                 let rawDst = match[3].trim();
 
-                let src = europe.regions.find(r => r.name == rawSrc);
+                let src = maps.standard.map.regions.find(r => r.name == rawSrc);
                 if (src == null) throw error(`failed to find region for retreat: ${raw}`);
 
-                let dst = europe.regions.find(r => r.name == rawDst);
+                let dst = maps.standard.map.regions.find(r => r.name == rawDst);
                 if (dst == null) throw error(`failed to find region for retreat: ${raw}`);
 
                 let unit = evicted.find(u => u.region == src && u.team == team);
@@ -379,7 +377,7 @@ export function parse_retreats(evicted: Unit[], inputs: Inputs) {
             } else {
                 let rawRegion = match[4].trim();
 
-                let region = europe.regions.find(r => r.name == rawRegion);
+                let region = maps.standard.map.regions.find(r => r.name == rawRegion);
                 if (region == null) throw error(`failed to find region for retreat: ${raw}`);
 
                 let unit = [...evicted].find(u => u.region == region && u.team == team);
@@ -407,7 +405,7 @@ export function parse_builds(game: GameState, inputs: Inputs) {
                 let type = match[2].trim();
                 let rawRegion = match[3].trim();
 
-                let region = europe.regions.find(r => r.name == rawRegion);
+                let region = maps.standard.map.regions.find(r => r.name == rawRegion);
                 if (region == null) throw error(`failed to find region for build: ${raw}`);
 
                 let unit = new Unit(region, type == 'fleet' ? UnitType.Water : UnitType.Land, team);
@@ -416,7 +414,7 @@ export function parse_builds(game: GameState, inputs: Inputs) {
             } else {
                 let rawRegion = match[4].trim();
 
-                let region = europe.regions.find(r => r.name == rawRegion);
+                let region = maps.standard.map.regions.find(r => r.name == rawRegion);
                 if (region == null) throw error(`failed to find region for build: ${raw}`);
 
                 let unit = [...game.units].find(u => u.region == region && u.team == team);

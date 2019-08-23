@@ -1,4 +1,4 @@
-import { Region, GameMap, UnitType } from './game';
+import { Region, GameMap, UnitType } from '../game';
 
 const LAND = UnitType.Land;
 const WATER = UnitType.Water;
@@ -100,14 +100,14 @@ let SKA = n('SKA', 'Skagerrack', WATER);
 let TYN = n('TYN', 'Tyrrhenian Sea', WATER);
 let WES = n('WES', 'Western Mediterranean', WATER);
 
-let STP_NORTH = n('STP', 'St. Petersburg (North Coast)', LAND);
-let STP_SOUTH = n('STP', 'St. Petersburg (South Coast)', LAND);
+let STP_NORTH = n('STPN', 'St. Petersburg (North Coast)', LAND);
+let STP_SOUTH = n('STPS', 'St. Petersburg (South Coast)', LAND);
 
-let SPA_NORTH = n('SPA', 'Spain (North Coast)', LAND);
-let SPA_SOUTH = n('SPA', 'Spain (South Coast)', LAND);
+let SPA_NORTH = n('SPAN', 'Spain (North Coast)', LAND);
+let SPA_SOUTH = n('SPAS', 'Spain (South Coast)', LAND);
 
-let BUL_NORTH = n('BUL', 'Bulgaria (East Coast)', LAND);
-let BUL_SOUTH = n('BUL', 'Bulgaria (South Coast)', LAND);
+let BUL_NORTH = n('BULE', 'Bulgaria (East Coast)', LAND);
+let BUL_SOUTH = n('BULS', 'Bulgaria (South Coast)', LAND);
 
 function border(node: Region, adjacent: Region[]) {
     for (let other of adjacent)
@@ -213,6 +213,6 @@ border(SYR, [SMY, ARM, EAS]);
 border(BUD, [VIE, GAL, RUM, SER, TRI]);
 border(ANK, [BLA, ARM, SMY, CON]);
 
-export const europe = new GameMap([BOH, BUD, GAL, TRI, TYR, VIE, CLY, EDI, LVP, LON, WAL, YOR, BRE, BUR, GAS, MAR, PAR, PIC, BER, KIE, MUN, PRU, RUH, SIL, APU, NAP, PIE, ROM, TUS, VEN, FIN, LVN, MOS, SEV, STP, UKR, WAR, ANK, ARM, CON, SMY, SYR, ALB, BEL, BUL, DEN, GRE, HOL, NWY, NAF, POR, RUM, SER, SPA, SWE, TUN, ADR, AEG, BAL, BAR, BLA, EAS, ENG, BOT, GOL, HEL, ION, IRI, MID, NAT, NTH, NRG, SKA, TYN, WES, STP_NORTH, STP_SOUTH, SPA_NORTH, SPA_SOUTH, BUL_NORTH, BUL_SOUTH]);
+export const map = new GameMap([BOH, BUD, GAL, TRI, TYR, VIE, CLY, EDI, LVP, LON, WAL, YOR, BRE, BUR, GAS, MAR, PAR, PIC, BER, KIE, MUN, PRU, RUH, SIL, APU, NAP, PIE, ROM, TUS, VEN, FIN, LVN, MOS, SEV, STP, UKR, WAR, ANK, ARM, CON, SMY, SYR, ALB, BEL, BUL, DEN, GRE, HOL, NWY, NAF, POR, RUM, SER, SPA, SWE, TUN, ADR, AEG, BAL, BAR, BLA, EAS, ENG, BOT, GOL, HEL, ION, IRI, MID, NAT, NTH, NRG, SKA, TYN, WES, STP_NORTH, STP_SOUTH, SPA_NORTH, SPA_SOUTH, BUL_NORTH, BUL_SOUTH]);
 
-export const REGIONS = { BOH, BUD, GAL, TRI, TYR, VIE, CLY, EDI, LVP, LON, WAL, YOR, BRE, BUR, GAS, MAR, PAR, PIC, BER, KIE, MUN, PRU, RUH, SIL, APU, NAP, PIE, ROM, TUS, VEN, FIN, LVN, MOS, SEV, STP, UKR, WAR, ANK, ARM, CON, SMY, SYR, ALB, BEL, BUL, DEN, GRE, HOL, NWY, NAF, POR, RUM, SER, SPA, SWE, TUN, ADR, AEG, BAL, BAR, BLA, EAS, ENG, BOT, GOL, HEL, ION, IRI, MID, NAT, NTH, NRG, SKA, TYN, WES, STP_NORTH, STP_SOUTH, SPA_NORTH, SPA_SOUTH, BUL_NORTH, BUL_SOUTH };
+export const allRegions = { BOH, BUD, GAL, TRI, TYR, VIE, CLY, EDI, LVP, LON, WAL, YOR, BRE, BUR, GAS, MAR, PAR, PIC, BER, KIE, MUN, PRU, RUH, SIL, APU, NAP, PIE, ROM, TUS, VEN, FIN, LVN, MOS, SEV, STP, UKR, WAR, ANK, ARM, CON, SMY, SYR, ALB, BEL, BUL, DEN, GRE, HOL, NWY, NAF, POR, RUM, SER, SPA, SWE, TUN, ADR, AEG, BAL, BAR, BLA, EAS, ENG, BOT, GOL, HEL, ION, IRI, MID, NAT, NTH, NRG, SKA, TYN, WES, STP_NORTH, STP_SOUTH, SPA_NORTH, SPA_SOUTH, BUL_NORTH, BUL_SOUTH };

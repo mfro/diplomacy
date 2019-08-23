@@ -1,9 +1,7 @@
 import fs from 'fs-extra';
-import request from 'request-promise-native';
 
-import { europe, REGIONS } from './data';
-import { Unit, Region, GameState, UnitType } from './game';
-import { AnyOrder, MoveOrder, HoldOrder, SupportOrder, ConvoyOrder, resolve } from './rules';
+import { GameState, maps, HoldOrder, resolve, Unit, MoveOrder, SupportOrder, ConvoyOrder, UnitType, formatter } from 'diplomacy-common';
+
 import * as scrape from './scrape';
 import { error } from './util';
 
@@ -22,13 +20,20 @@ const ignored_games = new Set([
     139460, // idek
     139815, // Spring 1914 spain
     141277, // Fall 1901 messed up convoy stuff
+    142580, // Fall 1902 Vencie move Tuscany fails for no reason
+    144825, // Fall 1908 Burgundy move Munich fails for no reason
+    145645, // Fall 1904 Build fleet St. Petersburg is actually an army
+    147521, // Spring 1906 Retreat English fleet in st. petersburg becomes russian
+    149280, // Fall 1904 Build destroy foreign unit
+    149871, // Fall 1901 messed up convoy stuff
+    149890, // Fall 1906 invalid build/destroy inputs
 ]);
 const teams = new Set(['ENGLAND', 'FRANCE', 'GERMANY', 'ITALY', 'AUSTRIA', 'RUSSIA', 'TURKEY']);
 
 const totals = { checked: 0, skipped_via: 0, skipped_team: 0 };
 
 function run_game(id: number, turns: scrape.Turn[]) {
-    let game = new GameState(europe, []);
+    let game = new GameState(maps.standard.map, []);
 
     for (let i = 0; i < turns.length; ++i) {
         console.debug(`processing ${i % 2 ? 'fall' : 'spring'} ${1901 + Math.floor(i / 2)}`);
@@ -124,9 +129,8 @@ async function run() {
     fs.mkdirpSync('data');
     fs.mkdirpSync('cache');
 
-    // let game = scrape.read_game(fs.readFileSync(`data/155270`));
-    // run_game(155270, game);
-
+    // run_game(150168, scrape.read_game(fs.readFileSync('data/150168')));
+    
     let allIds = fs.readdirSync('data');
 
     for (let id of allIds) {
@@ -142,36 +146,9 @@ async function run() {
     console.log(totals);
 }
 
-let x = global;
-
+let x = global as any;
 if (x.devtoolsFormatters == null) x.devtoolsFormatters = [];
-x.devtoolsFormatters.push({
-    header(obj, config) {
-        if (obj instanceof MoveOrder || obj instanceof HoldOrder || obj instanceof SupportOrder || obj instanceof ConvoyOrder) {
-            return ["span", {}, obj.toString()];
-        }
-
-        if (obj instanceof Unit) {
-            return ["span", {}, `${obj.team} ${obj.type == UnitType.Water ? 'fleet' : 'army'} in ${obj.region.name}`];
-        }
-
-        return null;
-    },
-    hasBody(obj, config) {
-        return false;
-        // return obj instanceof OrderBase;
-    },
-    body(obj, config) {
-        // let children = [];
-        // for (let key in obj) {
-
-        // }
-        // return [
-        //     'ol',
-        //     {},
-        // ]
-    }
-});
+x.devtoolsFormatters.push(formatter);
 
 let op = process.argv[2];
 
