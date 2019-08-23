@@ -89,19 +89,19 @@
             </v-card-text>
           </v-card>
 
-          <v-card v-else-if="build.orderType == 'convoy'" class="ma-3">
-            <v-card-title>
-              <span>Select a convoy destination</span>
-            </v-card-title>
-          </v-card>
-
           <v-card v-else-if="build.orderType == 'support'" class="ma-3">
             <v-card-title>
               <span>Select a support destination</span>
             </v-card-title>
-            <v-card-text class="text--primary">
+            <v-card-text class="text--primary" v-if="canConvoy">
               <p>Right click again to give a convoy order</p>
             </v-card-text>
+          </v-card>
+
+          <v-card v-else-if="build.orderType == 'convoy'" class="ma-3">
+            <v-card-title>
+              <span>Select a convoy destination</span>
+            </v-card-title>
           </v-card>
         </div>
 
@@ -176,21 +176,13 @@ export default {
   },
 
   computed: {
-    unitTypeString() {
-      if (this.build.unitType === UnitType.Water)
-        return 'fleet';
-
-      if (this.build.unitType === UnitType.Land)
-        return 'army';
-
-      return '?';
-    },
-
     canConvoy() {
-      if (this.build.unitType === null || this.build.unitRegion === null)
+      if (this.unit == null)
         return false;
 
-      return this.build.unitType == UnitType.Water && this.build.unitRegion.type == UnitType.Water;
+      return this.build.orderType == 'support'
+        && this.unit.region.type == UnitType.Water
+        && this.build.orderRegion.type == UnitType.Land;
     },
 
     unit() {
@@ -280,8 +272,7 @@ export default {
         }
 
         if (button == 2) {
-          if (this.build.orderType == 'support' &&
-            Region.areSame(this.build.orderRegion, region)) {
+          if (this.canConvoy && Region.areSame(this.build.orderRegion, region)) {
             this.build.orderType = 'convoy';
             this.build.orderRegion = region;
           } else {
