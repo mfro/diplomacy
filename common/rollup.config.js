@@ -1,9 +1,9 @@
 import typescript from 'rollup-plugin-typescript2';
 
 module.exports = {
-    input: 'src/main.ts',
+    input: 'src/index.ts',
     output: {
-        file: 'out/main.js',
+        file: 'out/index.js',
         format: 'cjs',
         sourcemap: 'inline',
     },

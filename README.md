@@ -1,19 +1,19 @@
-## Diplomacy rules solver
-
-### Code overview:
+### common:
 
 `game.ts` : Structures to define game map and game state including regions and units.
 
-`data.ts` : Description of standard game map, including all regions and adjacency data. 
-
 `rules.ts` : Structures to define orders and core order resolution logic.
 
-`scrape.ts` : Logic to scrape game data from playdiploacy.com and save it in a gzipped format, and logic to load and parse previously scraped data.
+`maps/standard.ts` : Description of standard game map, including all regions and adjacency data. 
 
-`main.ts` : Runs through all saved game data and runes it through the order resolver to compare the results.
+`formatter.ts` : Chrome devtools formatter to aid in debugging orders
 
-### Can be run as follows:
+### scraper:
 
-`node . scrape` Scrape public game data from playdiplomacy.com and saves it, gzipped, in the `data` folder.
+Contains logic for downloading game data from playdiplomacy.com and saving it to `scraper/data`. Also has logic for loading and parsing that data.
 
-`node . run` Runs the saved game data through the rules resolver, comparing it against the expected results from playdiplomacy.com's rules resolver.
+Run as `node . run` to run all the saved data against the orders resolver to compare the results against playdiplomacy.com's resolver
+
+### web app:
+
+Web interface to input orders to the orders resolver with a fancy interface.
