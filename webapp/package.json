@@ -9,7 +9,7 @@
   "dependencies": {
     "core-js": "^2.6.5",
     "dejavu-sans": "^1.0.0",
-    "node-sass": "^4.12.0",
+    "node-sass": "^4.13.1",
     "vue": "^2.6.10",
     "vuetify": "^2.0.10"
   },
